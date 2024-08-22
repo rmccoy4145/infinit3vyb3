@@ -1,7 +1,4 @@
-package app.geo.stub;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+package com.mccoy;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -13,12 +10,13 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 public class AudioServer implements Runnable{
 
-    private static final Logger LOG = LoggerFactory.getLogger(AudioServer.class);
+    private static final Logger LOG = Logger.getLogger(AudioServer.class.getName());
     public final static int PORT = 65535;
-    private final String audioFilePath = "resources/ImperialMarch60.wav";
+    private final String audioFilePath = "audio/ImperialMarch60.wav";
     private ServerSocket serverSocket;
     private volatile boolean running = true;
     private final List<ClientHandler> clients = new ArrayList<>();

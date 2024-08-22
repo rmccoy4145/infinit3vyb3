@@ -1,4 +1,4 @@
-package app.geo.stub;
+package com.mccoy;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
