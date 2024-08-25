@@ -16,7 +16,7 @@ public class AudioServer implements Runnable {
 
     private static final Logger LOG = Logger.getLogger(AudioServer.class.getName());
     public final static int PORT = AppConfig.SERVER_AUDIO_UDP_PORT;
-    private final String audioFilePath = "audio/Focused.wav";
+    private final String audioFilePath = "audio/ImperialMarch60.wav";
     private ServerSocket serverSocket;
     private volatile boolean running = true;
     private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
