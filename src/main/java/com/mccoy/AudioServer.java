@@ -15,13 +15,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class AudioServer implements Runnable {
 
     private static final Logger LOG = Logger.getLogger(AudioServer.class.getName());
-    public final static int PORT = 65535;
+    public final static int PORT = AppConfig.SERVER_AUDIO_UDP_PORT;
     private final String audioFilePath = "audio/Focused.wav";
     private ServerSocket serverSocket;
     private volatile boolean running = true;
     private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
     private Thread playbackThread = null;
-    public static final String MULTICAST_GROUP_ADDRESS = "230.0.0.1";
+    public static final String MULTICAST_GROUP_ADDRESS = AppConfig.SERVER_AUDIO_MULTICAST_GROUP_ADDRESS;
     File audioFile = null;
     private final InetConnection inetConnection;
 

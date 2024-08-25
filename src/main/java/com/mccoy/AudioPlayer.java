@@ -11,9 +11,7 @@ public class AudioPlayer {
 
     private boolean playing = true;
     String serverAddress = "localhost"; // Replace with your server's address
-    int port = 65535;
     boolean tcpStream = false;
-    private static final String MULTICAST_GROUP_ADDRESS = "230.0.0.1";
     private static final int BUFFER_SIZE = 4096;
     private final InetConnection inetConnection;
 
@@ -32,9 +30,9 @@ public class AudioPlayer {
     }
 
     private void udpStream() {
-        try (MulticastSocket udpSocket = new MulticastSocket(this.port)) {
-            InetAddress multicastGroup = InetAddress.getByName(MULTICAST_GROUP_ADDRESS);
-            udpSocket.joinGroup(new InetSocketAddress(multicastGroup, this.port), inetConnection.getNetworkInterface());
+        try (MulticastSocket udpSocket = new MulticastSocket(AppConfig.SERVER_AUDIO_UDP_PORT)) {
+            InetAddress multicastGroup = InetAddress.getByName(AppConfig.SERVER_AUDIO_MULTICAST_GROUP_ADDRESS);
+            udpSocket.joinGroup(new InetSocketAddress(multicastGroup, AppConfig.SERVER_AUDIO_UDP_PORT), inetConnection.getNetworkInterface());
 
             byte[] buffer = new byte[BUFFER_SIZE];
 
@@ -62,7 +60,7 @@ public class AudioPlayer {
     }
 
      private void tcpStream() {
-         try (Socket socket = new Socket(this.serverAddress, this.port);InputStream inputStream = socket.getInputStream()) {
+         try (Socket socket = new Socket(this.serverAddress, AppConfig.SERVER_AUDIO_UDP_PORT);InputStream inputStream = socket.getInputStream()) {
 
              // BufferedInputStream to buffer the incoming audio stream
              BufferedInputStream bufferedIn = new BufferedInputStream(inputStream);
