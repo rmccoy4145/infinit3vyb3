@@ -1,29 +1,36 @@
 package com.mccoy;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
+import java.net.*;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class AudioServer implements Runnable{
 
-    private static final Logger LOG = Logger.getLogger(AudioServer.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(AudioServer.class);
     public final static int PORT = 65535;
     private final String audioFilePath = "audio/ImperialMarch60.wav";
     private ServerSocket serverSocket;
     private volatile boolean running = true;
-    private final List<ClientHandler> clients = new ArrayList<>();
+    private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
     private Thread playbackThread = null;
+    public static final String MULTICAST_GROUP_ADDRESS = "230.0.0.1";
+    File audioFile = null;
 
 
-    public AudioServer() {
+    public AudioServer() throws IOException {
+        this.audioFile = new File(audioFilePath);
+        if (!audioFile.exists()) {
+            throw new IOException("Audio file not found: " + audioFilePath);
+        }
     }
 
     @Override
@@ -32,6 +39,7 @@ public class AudioServer implements Runnable{
         playbackThread.start();
 
         try {
+
             serverSocket = new ServerSocket(PORT);
             LOG.info("Audio Server started on port " + PORT + "...");
 
@@ -65,14 +73,13 @@ public class AudioServer implements Runnable{
     }
 
     private void playAudio() {
-        File audioFile = new File(audioFilePath);
-        if (!audioFile.exists()) {
-            System.out.println("Audio file not found: " + audioFilePath);
-            return;
-        }
 
+        System.out.println("Starting multicast audio streaming on " + MULTICAST_GROUP_ADDRESS + ":" + PORT);
         while (running) {
-            try (AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(audioFile)) {
+                try (MulticastSocket multicastSocket = new MulticastSocket();
+                     AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(audioFile)) {
+                InetAddress multicastGroup = InetAddress.getByName(MULTICAST_GROUP_ADDRESS);
+                multicastSocket.setInterface(InetAddress.getByName("127.0.0.1"));
 
                 AudioFormat format = audioInputStream.getFormat();
                 printAudioFormatInfo(format);
@@ -85,13 +92,17 @@ public class AudioServer implements Runnable{
                 long startTime = System.currentTimeMillis();
 
                 while ((bytesRead = audioInputStream.read(buffer)) != -1 && running) {
+                    DatagramPacket packet = new DatagramPacket(buffer, bytesRead, multicastGroup, PORT);
+                    multicastSocket.send(packet);
 
                     // Broadcast the audio data only if there are clients connected
-                    synchronized (clients) {
-                        if (!clients.isEmpty()) {
-                            broadcast(buffer, bytesRead);
-                        }
-                    }
+//                    synchronized (clients) {
+//                        if (!clients.isEmpty()) {
+//                            DatagramPacket packet = new DatagramPacket(buffer, bytesRead, multicastGroup, PORT);
+//                            multicastSocket.send(packet);
+//                            System.out.println("Packet sent with length: " + bytesRead);
+//                        }
+//                    }
 
                     // Sleep for the time it would have taken to play the audio
                     long elapsedTime = System.currentTimeMillis() - startTime;
@@ -117,8 +128,10 @@ public class AudioServer implements Runnable{
 
     private void broadcast(byte[] buffer, int length) {
         synchronized (clients) {
-            for (ClientHandler client : clients) {
-                client.sendData(buffer, length);
+            for (ClientHandler clientHandler : clients) {
+                if(!clientHandler.sendData(buffer, length)) {
+                    clients.remove(clientHandler);
+                }
             }
         }
     }
@@ -157,14 +170,18 @@ public class AudioServer implements Runnable{
             }
         }
 
-        public void sendData(byte[] buffer, int length) {
-            if (!connected) return;
+        public boolean sendData(byte[] buffer, int length) {
+            if (!connected) return false;
             try {
                 clientSocket.getOutputStream().write(buffer, 0, length);
+                return true;
             } catch (IOException e) {
                 disconnect();
+                return false;
             }
         }
+
+        public boolean isConnected() {return connected;}
 
         private void disconnect() {
             connected = false;
@@ -180,7 +197,7 @@ public class AudioServer implements Runnable{
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         AudioServer audioSvr = new AudioServer();
         Thread audioSvrThread = new Thread(audioSvr);
         audioSvrThread.start();
