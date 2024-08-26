@@ -9,30 +9,55 @@ import java.net.*;
 
 public class AudioPlayer {
 
-    private boolean playing = true;
-    String serverAddress = "localhost"; // Replace with your server's address
-    boolean tcpStream = false;
+    private volatile boolean playing = true;
+    private volatile boolean connected = false;
     private static final int BUFFER_SIZE = 4096;
     private final InetConnection inetConnection;
+    public final String serverIpAddress = AppConfig.SERVER_IP_ADDRESS;
+    public final int serverAudioUdpPort = AppConfig.SERVER_AUDIO_UDP_PORT;
+    public final int serverTcpPort = AppConfig.SERVER_LISTEN_TCP_PORT;
+
 
     AudioPlayer(boolean tcpStream) throws SocketException {
         this.inetConnection = new InetConnection();
-        this.tcpStream = tcpStream;
     }
 
-    public void play() {
-        this.playing = true;
-        if(tcpStream) {
-            this.tcpStream();
-        } else {
-            this.udpStream();
+    public void start() {
+        while(!connected) {
+            connect();
+        }
+        this.udpStream();
+    }
+
+    private void connect() {
+        try (Socket socket = new Socket(this.serverIpAddress, this.serverTcpPort);
+            InputStream inputStream = socket.getInputStream()) {
+
+            BufferedInputStream bufferedIn = new BufferedInputStream(inputStream);
+            System.out.println("Connected");
+            this.connected = true;
+
+            // Buffer to hold the audio data
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            long totalBytesRead = 0;
+
+
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.out.println("Connection lost. Attempting to reconnect...");
+            // Optionally wait before trying to reconnect
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     private void udpStream() {
-        try (MulticastSocket udpSocket = new MulticastSocket(AppConfig.SERVER_AUDIO_UDP_PORT)) {
-            InetAddress multicastGroup = InetAddress.getByName(AppConfig.SERVER_AUDIO_MULTICAST_GROUP_ADDRESS);
-            udpSocket.joinGroup(new InetSocketAddress(multicastGroup, AppConfig.SERVER_AUDIO_UDP_PORT), inetConnection.getNetworkInterface());
+        try (DatagramSocket udpSocket = new DatagramSocket(this.serverAudioUdpPort)) {
+            this.playing = true;
 
             byte[] buffer = new byte[BUFFER_SIZE];
 
@@ -59,65 +84,6 @@ public class AudioPlayer {
         }
     }
 
-     private void tcpStream() {
-         try (Socket socket = new Socket(this.serverAddress, AppConfig.SERVER_AUDIO_UDP_PORT);InputStream inputStream = socket.getInputStream()) {
-
-             // BufferedInputStream to buffer the incoming audio stream
-             BufferedInputStream bufferedIn = new BufferedInputStream(inputStream);
-
-             // Get the audio format from the AudioInputStream
-             AudioFormat format = new AudioFormat(22050, 16, 1, true, false);
-             AudioInputStream audioStream = new AudioInputStream(bufferedIn, format, AudioSystem.NOT_SPECIFIED);
-
-             printAudioFormatInfo(format);
-             DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
-             SourceDataLine audioLine = (SourceDataLine) AudioSystem.getLine(info);
-             audioLine.open(format);
-
-             // Start the audio line to begin playback
-             audioLine.start();
-             System.out.println("Playback started...");
-
-             // Buffer to hold the audio data
-             byte[] buffer = new byte[4096];
-             int bytesRead;
-             long totalBytesRead = 0;
-
-             // Read from the audio stream and write to the audio line for playback
-             while(this.playing) {
-                 if ((bytesRead = audioStream.read(buffer)) > 0) {
-                     audioLine.write(buffer, 0, bytesRead);
-                     totalBytesRead += bytesRead;
-
-                 } else if (bytesRead == -1) {
-                     // If -1 is encountered, reset the audioStream to handle looping
-                     audioStream = AudioSystem.getAudioInputStream(bufferedIn);
-                 }
-
-                 // Print playback information every second or every certain number of bytes
-                 if (totalBytesRead % (format.getFrameSize() * format.getFrameRate()) < buffer.length) {
-                     printPlaybackInfo(format, totalBytesRead);
-                 }
-             }
-
-             // Cleanup: drain the audio line and close resources
-             audioLine.drain();
-             audioLine.close();
-             audioStream.close();
-
-             System.out.println("Playback completed.");
-
-         } catch (UnsupportedAudioFileException | IOException | LineUnavailableException ex) {
-             ex.printStackTrace();
-             System.out.println("Connection lost. Attempting to reconnect...");
-             // Optionally wait before trying to reconnect
-             try {
-                 Thread.sleep(5000);
-             } catch (InterruptedException e) {
-                 e.printStackTrace();
-             }
-         }
-     }
 
     public void stop() {
         this.playing = false;
@@ -144,6 +110,6 @@ public class AudioPlayer {
 
     public static void main(String[] args) throws SocketException {
         AudioPlayer audioPlayer = new AudioPlayer(false);
-        audioPlayer.play();
+        audioPlayer.start();
     }
 }

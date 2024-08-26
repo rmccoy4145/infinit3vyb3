@@ -11,7 +11,7 @@ public class InetConnection {
     private InetAddress inetAddress;
     private NetworkInterface networkInterface;
 
-    InetConnection() throws SocketException {
+    public InetConnection() throws SocketException {
         this.setInet();
     }
 
